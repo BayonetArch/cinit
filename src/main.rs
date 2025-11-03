@@ -1,51 +1,31 @@
-use crate::attrs::Attrs;
 use anyhow::Ok;
+use simple_term_attr::{LogLevel, StyleAttributes, debug_print, debug_println};
 use std::{
     env,
     fs::{DirBuilder, File},
-    io::Write,
+    io::{self, Write, stdout},
     process::{Command, exit},
 };
 
-mod attrs;
-
-#[allow(dead_code)]
-enum DebugLevel {
-    INFO,
-    WARN,
-    ERROR,
-}
-
-macro_rules! debug_print {
-    ($l:expr,$($fmt:tt)*) => {
-        match $l {
-            DebugLevel::INFO => println!("[{}]: {}","i".grey(),format!($($fmt)*)),
-            DebugLevel::WARN => eprintln!("[{}]: {}","w".yellow_bold(),format!($($fmt)*)),
-            DebugLevel::ERROR => eprintln!("[{}]: {}","e".red_bold(),format!($($fmt)*)),
-        }
-    };
-}
-
 fn run_cmd(cmd: &str) -> anyhow::Result<String> {
-    debug_print!(DebugLevel::INFO, "Running command '{}'", cmd.green());
-
+    debug_println!(LogLevel::INFO, "Running command {}", cmd.green());
     let out = Command::new("sh").arg("-c").arg(cmd).output()?;
 
     if out.status.success() {
         let out = String::from_utf8_lossy(&out.stdout);
         return Ok(out.to_string());
     } else {
-        debug_print!(DebugLevel::ERROR, "Command Failed");
+        debug_println!(LogLevel::ERROR, "Command Failed");
 
         let out = String::from_utf8_lossy(&out.stderr);
 
-        eprintln!("Reason:\n'{}'", out.to_string().as_str().underline());
+        eprintln!("Reason:\n\n{}", out);
         exit(1);
     }
 }
 
 fn setup_makefile(pn: &str) -> anyhow::Result<()> {
-    debug_print!(DebugLevel::INFO, "Writing makefile contents");
+    debug_println!(LogLevel::INFO, "Writing makefile contents");
 
     let makefile_path = format!("./{pn}/Makefile");
     let mut f = File::create(makefile_path)?;
@@ -54,7 +34,7 @@ fn setup_makefile(pn: &str) -> anyhow::Result<()> {
         r#"CC = gcc
 CFLAGS = -Wall -Wextra -ggdb
 SOURCE = {pn}.c
-TARGET = ./build/{pn}
+TARGET = build/{pn}
 HEADER = essen.h
 
 all: $(TARGET)
@@ -74,7 +54,7 @@ run: $(TARGET)
 
     f.write(makefile_contents.as_bytes())?;
 
-    debug_print!(DebugLevel::INFO, "Creating build directory");
+    debug_println!(LogLevel::INFO, "Creating build directory");
     let build_dir = format!("./{pn}/build");
     DirBuilder::new().create(build_dir)?;
 
@@ -92,7 +72,7 @@ fn setup_header(pn: &str) -> anyhow::Result<()> {
 }
 
 fn setup_main(pn: &str) -> anyhow::Result<()> {
-    debug_print!(DebugLevel::INFO, "Writing to '{pn}.c'");
+    debug_println!(LogLevel::INFO, "Writing to '{pn}.c'");
 
     let file_path = format!("./{pn}/{pn}.c");
 
@@ -139,8 +119,17 @@ fn main() -> anyhow::Result<()> {
     let project_name = parse_args();
 
     if project_name.len() > 25 {
-        debug_print!(DebugLevel::ERROR, "Project name is too long");
+        debug_println!(LogLevel::ERROR, "Project name is too long");
         exit(1);
+    }
+    debug_print!(LogLevel::INFO, "Proceed (Y/n)?: ");
+    stdout().flush()?;
+    let mut buf = String::new();
+
+    io::stdin().read_line(&mut buf)?;
+
+    if !buf.contains(|x| x == 'Y' || x == 'y' || x == '\n') {
+        return Err(anyhow::anyhow!("Exiting.."));
     }
 
     DirBuilder::new().create(&project_name)?;
@@ -149,6 +138,5 @@ fn main() -> anyhow::Result<()> {
     setup_header(&project_name)?;
     setup_main(&project_name)?;
     test_run(&project_name)?;
-
     Ok(())
 }
