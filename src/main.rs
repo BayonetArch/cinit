@@ -39,6 +39,19 @@ HEADER = include/essen.h
 
 all: $(TARGET)
 
+CLANG ?= n
+GDB ?= n
+RUN_CMD ?= ./$(TARGET)
+
+ifeq ($(GDB), y)
+	RUN_CMD = gdb ./$(TARGET)	
+endif
+
+ifeq ($(CLANG),y)
+	CC = clang
+	CFLAGS += -fsanitize=address
+endif
+
 $(TARGET): $(SOURCE) $(HEADER)
 	$(CC) $(CFLAGS) $< -o $@
 
@@ -48,7 +61,7 @@ clean:
 .PHONY: run all clean
 
 run: $(TARGET)
-	./$(TARGET)
+	$(RUN_CMD)
 "#,
     );
 
