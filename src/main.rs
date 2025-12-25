@@ -95,7 +95,7 @@ fn setup_main(pn: &str) -> anyhow::Result<()> {
 #include "include/essen.h"
 
 int main(void) {{
-    println("Hello,World");
+    esl_println("Hello,World");
 
     return 0;
 }}"#
