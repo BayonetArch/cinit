@@ -32,10 +32,11 @@ fn setup_makefile(pn: &str) -> anyhow::Result<()> {
 
     let makefile_contents = format!(
         r#"CC = gcc
-CFLAGS = -Wall -Wextra -ggdb
+CFLAGS = -Wall -Wextra 
+LIBS   = 
 SOURCE = {pn}.c
 TARGET = build/{pn}
-HEADER = include/essen.h
+HEADER = include/cx.h
 
 all: $(TARGET)
 
@@ -44,6 +45,7 @@ GDB ?= n
 RUN_CMD ?= ./$(TARGET)
 
 ifeq ($(GDB), y)
+    CFLAGS += -ggdb
 	RUN_CMD = gdb ./$(TARGET)	
 endif
 
@@ -53,7 +55,7 @@ ifeq ($(CLANG),y)
 endif
 
 $(TARGET): $(SOURCE) $(HEADER)
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(LIBS) $(CFLAGS) $< -o $@
 
 clean:
 	rm -f $(TARGET)
@@ -75,10 +77,9 @@ run: $(TARGET)
 }
 
 fn setup_header(pn: &str) -> anyhow::Result<()> {
-    let header_link =
-        r"https://raw.githubusercontent.com/BayonetArch/essen.h/refs/heads/master/essen.h";
+    let header_link = r"https://raw.githubusercontent.com/BayonetArch/cx.h/refs/heads/master/cx.h";
 
-    let cmd = format!("wget {header_link} -O ./{pn}/include/essen.h");
+    let cmd = format!("wget {header_link} -O ./{pn}/include/cx.h");
     run_cmd(&cmd)?;
 
     Ok(())
@@ -91,11 +92,11 @@ fn setup_main(pn: &str) -> anyhow::Result<()> {
 
     let file_contents = format!(
         r#"/* {pn}.c */
-
-#include "include/essen.h"
+#define CX_STRIP_PREFIX
+#include "include/cx.h"
 
 int main(void) {{
-    esl_println("Hello,World");
+    println("Hello,World");
 
     return 0;
 }}"#
