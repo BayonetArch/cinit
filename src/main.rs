@@ -71,7 +71,7 @@ ifeq ($(CLANG),y)
 endif
 
 $(TARGET): $(SOURCE) $(HEADER)
-	$(CC) $(LIBS) $(CFLAGS) $< -o $@
+	$(CC)  $(CFLAGS) $(LIBS) $< -o $@
 
 clean:
 	rm -f $(TARGET)
