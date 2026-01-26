@@ -1,13 +1,29 @@
-use anyhow::Ok;
 use simple_term_attr::{LogLevel, StyleAttributes, debug_print, debug_println};
 use std::{
     env,
+    error::Error,
     fs::{DirBuilder, File},
     io::{self, Write, stdout},
     process::{Command, exit},
 };
 
-fn run_cmd(cmd: &str) -> anyhow::Result<String> {
+type Res<T> = Result<T, Box<dyn Error>>;
+
+struct Opts {
+    project_name: String,
+    git_project: bool,
+}
+
+impl Opts {
+    fn new() -> Self {
+        Self {
+            project_name: "..".to_string(),
+            git_project: false,
+        }
+    }
+}
+
+fn run_cmd(cmd: &str) -> Res<String> {
     debug_println!(LogLevel::INFO, "Running command {}", cmd.green());
     let out = Command::new("sh").arg("-c").arg(cmd).output()?;
 
@@ -24,7 +40,7 @@ fn run_cmd(cmd: &str) -> anyhow::Result<String> {
     }
 }
 
-fn setup_makefile(pn: &str) -> anyhow::Result<()> {
+fn setup_makefile(pn: &str) -> Res<()> {
     debug_println!(LogLevel::INFO, "Writing makefile contents");
 
     let makefile_path = format!("./{pn}/Makefile");
@@ -76,7 +92,7 @@ run: $(TARGET)
     Ok(())
 }
 
-fn setup_header(pn: &str) -> anyhow::Result<()> {
+fn setup_header(pn: &str) -> Res<()> {
     let header_link = r"https://raw.githubusercontent.com/BayonetArch/cx.h/refs/heads/master/cx.h";
 
     let cmd = format!("wget {header_link} -O ./{pn}/include/cx.h");
@@ -85,7 +101,7 @@ fn setup_header(pn: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn setup_main(pn: &str) -> anyhow::Result<()> {
+fn setup_main(pn: &str) -> Res<()> {
     debug_println!(LogLevel::INFO, "Writing to '{pn}.c'");
 
     let file_path = format!("./{pn}/{pn}.c");
@@ -108,7 +124,7 @@ int main(void) {{
     Ok(())
 }
 
-fn test_run(pn: &str) -> anyhow::Result<()> {
+fn test_run(pn: &str) -> Res<()> {
     let out = run_cmd(&format!("make --no-print-directory  -C ./{pn} run"))?;
 
     println!("--------------------------------------------------");
@@ -117,22 +133,54 @@ fn test_run(pn: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn parse_args() -> String {
-    let argv: Vec<_> = env::args().collect();
-
-    if argv.len() != 2 {
-        eprintln!("{}: No arguments provided", "Error".red());
-        eprintln!("Usage: {} <project_name>", &argv[0]);
-        exit(1);
-    }
-    let out = &argv[1];
-    out.to_string()
+fn usage(program: &str) {
+    println!("usage");
+    println!("  {} project_name [flags] ...", program);
+    println!();
+    println!("flags");
+    println!("-g   make it an git project");
+    println!("-h   print help message");
 }
 
-fn main() -> anyhow::Result<()> {
-    let project_name = parse_args();
+fn parse_args() -> Res<Opts> {
+    let mut args = env::args();
+    let program = args.next().unwrap();
 
-    if project_name.len() > 25 {
+    let mut opts = Opts::new();
+    if let Some(project_name) = args.next() {
+        opts.project_name = project_name;
+
+        while let Some(flag) = args.next() {
+            match flag.as_str() {
+                "-g" => {
+                    opts.git_project = true;
+                }
+
+                "-h" => {
+                    usage(&program);
+                    exit(0);
+                }
+
+                _ => {
+                    eprintln!("Unknown flag");
+                    exit(1);
+                }
+            };
+        }
+    } else {
+        eprintln!("{}: No arguments provided", "Error".red());
+        usage(&program);
+        return Err("project_name missing".into());
+    }
+
+    Ok(opts)
+}
+
+fn main() -> Res<()> {
+    let opts = parse_args()?;
+    let project_name = &opts.project_name;
+
+    if project_name.len() > 30 {
         debug_println!(LogLevel::ERROR, "Project name is too long");
         exit(1);
     }
@@ -144,15 +192,21 @@ fn main() -> anyhow::Result<()> {
     let buf = buf.trim().to_lowercase();
 
     if !(buf.contains('y')) && !buf.is_empty() {
-        return Err(anyhow::anyhow!("Exiting.."));
+        return Err("Exiting..".into());
     }
 
-    DirBuilder::new().create(&project_name)?;
+    DirBuilder::new().create(project_name)?;
     DirBuilder::new().create(&format!("{project_name}/include"))?;
 
-    setup_makefile(&project_name)?;
-    setup_header(&project_name)?;
-    setup_main(&project_name)?;
-    test_run(&project_name)?;
+    if opts.git_project {
+        let cmd = &format!("git init ./{project_name}");
+        run_cmd(cmd)?;
+    }
+
+    setup_makefile(project_name)?;
+    setup_header(project_name)?;
+    setup_main(project_name)?;
+    test_run(project_name)?;
+
     Ok(())
 }
