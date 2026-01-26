@@ -17,7 +17,7 @@ struct Opts {
 impl Opts {
     fn new() -> Self {
         Self {
-            project_name: "..".to_string(),
+            project_name: "None".to_string(),
             git_project: false,
         }
     }
@@ -144,31 +144,39 @@ fn usage(program: &str) {
 
 fn parse_args() -> Res<Opts> {
     let mut args = env::args();
+    let argc = env::args().count();
     let program = args.next().unwrap();
 
-    let mut opts = Opts::new();
-    if let Some(project_name) = args.next() {
-        opts.project_name = project_name;
-
-        while let Some(flag) = args.next() {
-            match flag.as_str() {
-                "-g" => {
-                    opts.git_project = true;
-                }
-
-                "-h" => {
-                    usage(&program);
-                    exit(0);
-                }
-
-                _ => {
-                    eprintln!("Unknown flag");
-                    exit(1);
-                }
-            };
-        }
-    } else {
+    if argc < 2 {
         eprintln!("{}: No arguments provided", "Error".red());
+        usage(&program);
+        return Err("project_name missing".into());
+    }
+
+    let mut opts = Opts::new();
+
+    while let Some(flag) = &args.next() {
+        match flag.as_str() {
+            "-g" => {
+                opts.git_project = true;
+            }
+
+            "-h" => {
+                usage(&program);
+                exit(0);
+            }
+
+            project_name if !project_name.starts_with("-") => {
+                opts.project_name = project_name.to_string();
+            }
+            _ => {
+                eprintln!("Unknown flag");
+                exit(1);
+            }
+        }
+    }
+
+    if opts.project_name == "None" {
         usage(&program);
         return Err("project_name missing".into());
     }
