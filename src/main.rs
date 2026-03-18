@@ -134,6 +134,7 @@ fn test_run(pn: &str) -> Res<()> {
 }
 
 fn usage(program: &str) {
+    println!("cinit: initialize an ready c project!");
     println!("usage");
     println!("  {} project_name [flags] ...", program);
     println!();
